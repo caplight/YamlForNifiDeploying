@@ -1,0 +1,66 @@
+# NiFi Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nifi-service
+spec:
+  ports:
+  - port: 8180
+    targetPort: 8080
+    name: http-port
+  - port: 8443
+    name: https-port
+  selector:
+    app: nifi
+  type: LoadBalancer 
+---
+# NiFi Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nifi
+  namespace: default
+  annotations:
+    cni.projectcalico.org/ipAddrs: "[\"127.0.0.1\"]"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nifi
+  template:
+    metadata:
+      labels:
+        app: nifi
+    spec: 
+      containers:
+      - name: nifi-container
+        image: "apache/nifi:1.10.0"
+        imagePullPolicy: Always
+        resources:
+          requests:
+            ephemeral-storage: "2Gi"
+          limits:
+            ephemeral-storage: "3Gi"
+        volumeMounts:
+        - name: nifi-pv
+          mountPath: /opt/nifi/nifi-current/logs
+        - name: nifi-pv
+          mountPath: /opt/nifi/nifi-current/share
+        ports:
+        - containerPort: 8080
+          name: http-port
+        - containerPort: 8443
+          name: https-port
+        env:
+        - name: VERSION
+          value: "1.10"
+        - name: BASE_DIR_SUFFIX
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      volumes:
+      - name: nifi-pv
+        persistentVolumeClaim: 
+          claimName: nifi-pvc
+---
+
